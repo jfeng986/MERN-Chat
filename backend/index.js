@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const { default: mongoose } = require('mongoose');
 const cors = require('cors');
 const User = require('./schema/user');
+const bcrybt = require('bcryptjs');
 
 
 dotenv.config();
@@ -13,7 +14,7 @@ mongoose.connect(process.env.MONGO_URL, (err) => {
 });
 
 const jwtSecret = process.env.JWT_SECRET_KEY;
-
+const bcrybtSalt = bcrybt.genSaltSync(10);
 const app = express();
 app.use(express.json());
 app.use(cookieParser())
@@ -29,12 +30,14 @@ app.get('/test', (req, res) => {
 app.post('/register', async (req,res) => {
   const {username,password} = req.body;
   try {
-    const createdUser = await User.create({username, password});
+    const createdUser = await User.create({
+      username, 
+      password: bcrybt.hashSync(password, bcrybtSalt),
+    });
     jwt.sign({userId:createdUser._id,username}, jwtSecret, {}, (err, token) => {
       if (err) throw err;
       res.cookie('token', token).status(201).json({
         id: createdUser._id,
-        username: createdUser.username,
       });
     });
   } catch(err) {
@@ -48,13 +51,34 @@ app.get('/profile', async (req, res) => {
   if(token){
     jwt.verify(token, jwtSecret, async (err, decoded) => {
       if(err) throw err;
-      res.json({decoded});
+      res.json(decoded);
     });
   }
   else{
     res.status(401).json('no token');
   }
   
+});
+
+app.post('/login', async (req, res) => {
+  const {username,password} = req.body;
+  const foundUser = await User.findOne({username});
+  if(foundUser){
+    const isPasswordValid = bcrybt.compareSync(password, foundUser.password);
+    if(isPasswordValid){
+      jwt.sign({userId:foundUser._id,username}, jwtSecret, {}, (err, token) => {
+        if (err) throw err;
+        res.cookie('token', token).status(201).json({
+          id: foundUser._id,
+        });
+      });
+    }
+    else{
+      res.status(401).json('wrong password');
+    }
+  }
+
+
 });
 
 app.listen(3000);

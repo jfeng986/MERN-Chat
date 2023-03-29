@@ -8,9 +8,10 @@ export default function Register() {
   const [isLoginOrRegister, setIsLoginOrRegister] = useState("register");
   const {setUsername:setLoggedInUsername, setId} = useContext(UserContext);
 
-  async function register(event){
+  async function handleSubmit(event){
     event.preventDefault();
-    const {data} = await axios.post("/register", {username, password});
+    const url = isLoginOrRegister === "register" ? "/register" : "/login";
+    const {data} = await axios.post(url, {username, password});
     setLoggedInUsername(username);
     setId(data.id);
   }
@@ -18,7 +19,7 @@ export default function Register() {
 
   return (
     <div className="bg-blue-50 h-screen flex items-center">
-      <form className="w-64 mx-auto" onSubmit={register}>
+      <form className="w-64 mx-auto" onSubmit={handleSubmit}>
         <input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
