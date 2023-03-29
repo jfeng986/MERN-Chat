@@ -6,6 +6,7 @@ const { default: mongoose } = require('mongoose');
 const cors = require('cors');
 const User = require('./schema/user');
 const bcrybt = require('bcryptjs');
+const ws = require('ws');
 
 
 dotenv.config();
@@ -77,10 +78,39 @@ app.post('/login', async (req, res) => {
       res.status(401).json('wrong password');
     }
   }
-
-
 });
 
-app.listen(3000);
+const server = app.listen(3000);
 
-//NbxDAKlnprWgO8pp
+
+const webSocketServer = new ws.WebSocketServer({server});
+webSocketServer.on('connection', (connection, req) => {
+  const cookies = req.headers.cookie;
+  if(cookies){
+    const tokenString = cookies.split(' ').find(str => str.startsWith('token='));
+    if(tokenString){
+      const token = tokenString.split('=')[1];
+      jwt.verify(token, jwtSecret, async (err, decoded) => {
+        if(err) throw err;
+        const{userId, username} = decoded;
+        connection.userId = userId;
+        connection.username = username;
+      });
+    }
+  }
+  //console.log(webSocketServer.clients.size);
+  //console.log([...webSocketServer.clients].map(client => client.username));
+  [...webSocketServer.clients].forEach(client => {
+      client.send(JSON.stringify({
+        online: [...webSocketServer.clients].map(client => ({userId:client.userId, username:client.username}))
+
+      }
+        //[...webSocketServer.clients].map(client => ({userId:client.userId, username:client.username}))
+        
+
+
+      ));
+  }
+);
+});
+
