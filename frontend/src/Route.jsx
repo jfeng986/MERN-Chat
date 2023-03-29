@@ -6,10 +6,10 @@ export default function Route() {
     const {username, id} = useContext(UserContext);
 
     if(username && id){
-        return "You are logged in";
+        return "You are logged in" + username;
     }
 
-  return (
-    <Register/>
-  );
+    return (
+        <Register/>
+    );
 }

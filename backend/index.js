@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const { default: mongoose } = require('mongoose');
 const cors = require('cors');
 const User = require('./schema/user');
@@ -15,6 +16,7 @@ const jwtSecret = process.env.JWT_SECRET_KEY;
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser())
 app.use(cors({
     credentials: true,
     origin: process.env.FRONTEND_URL,
@@ -25,20 +27,35 @@ app.get('/test', (req, res) => {
 });
 
 app.post('/register', async (req,res) => {
-    const {username,password} = req.body;
-    try {
-      const createdUser = await User.create({username, password});
-      jwt.sign({userId:createdUser._id,username}, jwtSecret, {}, (err, token) => {
-        if (err) throw err;
-        res.cookie('token', token).status(201).json({
-          id: createdUser._id,
-        });
-      });
-    } catch(err) {
+  const {username,password} = req.body;
+  try {
+    const createdUser = await User.create({username, password});
+    jwt.sign({userId:createdUser._id,username}, jwtSecret, {}, (err, token) => {
       if (err) throw err;
-      res.status(500).json('error');
-    }
-  });
+      res.cookie('token', token).status(201).json({
+        id: createdUser._id,
+        username: createdUser.username,
+      });
+    });
+  } catch(err) {
+    if (err) throw err;
+    res.status(500).json('error');
+  }
+});
+
+app.get('/profile', async (req, res) => {
+  const token = req.cookies?.token;
+  if(token){
+    jwt.verify(token, jwtSecret, async (err, decoded) => {
+      if(err) throw err;
+      res.json({decoded});
+    });
+  }
+  else{
+    res.status(401).json('no token');
+  }
+  
+});
 
 app.listen(3000);
 
