@@ -2,25 +2,25 @@ import { useEffect,useState } from "react"
 
 export default function Chat() {
     const[ws,setWs] = useState(null);
-    const [onlinePeople,setOnlinePeople] = useState({});
+    const [onlineUser,setOnlineUser] = useState({});
     useEffect(()=>{    
         const ws = new WebSocket("ws://localhost:3000");
         setWs(ws);
         ws.addEventListener('message',sendMessage)
     },[]);
 
-    function showOnlinePeople(onlinePeople){
-        const onlinePeopleSet = {};
-        onlinePeople.forEach(({userId,username}) => {
-            onlinePeopleSet[userId] = username;
+    function showOnlineUser(onlineUser){
+        const onlineUserSet = {};
+        onlineUser.forEach(({userId,username}) => {
+            onlineUserSet[userId] = username;
         });
-        setOnlinePeople(onlinePeopleSet);
+        setOnlineUser(onlineUserSet);
     }
 
     function sendMessage(event){
         const messageData = JSON.parse(event.data);
         if('online' in messageData){
-            showOnlinePeople(messageData.online);
+            showOnlineUser(messageData.online);
         }
         /*
         event.data.text().then(messageString=>{
@@ -48,10 +48,10 @@ export default function Chat() {
                 </svg>
                 mernChat
                 </div>
-                {Object.keys(onlinePeople).map(userId=>
+                {Object.keys(onlineUser).map(userId=>
                 <div key={userId} 
                 className="border-b border-gray-100 py-2">
-                    {onlinePeople[userId]}
+                    {onlineUser[userId]}
                 </div>)}
             </div>
             <div className="bg-green-300 w-2/3 p-1 flex flex-col">
