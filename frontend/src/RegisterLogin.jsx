@@ -18,7 +18,7 @@ export default function Register() {
   
 
   return (
-    <div className="bg-blue-50 h-screen flex items-center">
+    <div className="bg-green-50 h-screen flex items-center">
       <form className="w-64 mx-auto" onSubmit={handleSubmit}>
         <input
           value={username}
@@ -34,7 +34,7 @@ export default function Register() {
           placeholder="password"
           className="block w-full rounded-sm p-2 mb-2"
         />
-        <button className="bg-blue-500 text-white w-full rounded-sm p-2">
+        <button className="bg-green-500 text-white w-full rounded-sm p-2">
           {isLoginOrRegister === "register" ? "Register" : "Login"}
         </button>
         <div className="text-center mt-2">
