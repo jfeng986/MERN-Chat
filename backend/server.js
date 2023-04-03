@@ -98,18 +98,20 @@ webSocketServer.on('connection', (connection, req) => {
       });
     }
   }
-  //console.log(webSocketServer.clients.size);
-  //console.log([...webSocketServer.clients].map(client => client.username));
+
+  connection.on('message', (message, isBinary) => {
+    console.log(isBinary ? message.toString() : message);
+  });
+
+
+ 
+  //notify all online clients about new user is joined
   [...webSocketServer.clients].forEach(client => {
       client.send(JSON.stringify({
         online: [...webSocketServer.clients].map(client => ({userId:client.userId, username:client.username}))
 
       }
-        //[...webSocketServer.clients].map(client => ({userId:client.userId, username:client.username}))
-        
-
-
-      ));
+    ));
   }
 );
 });
