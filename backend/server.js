@@ -99,8 +99,17 @@ webSocketServer.on('connection', (connection, req) => {
     }
   }
 
-  connection.on('message', (message, isBinary) => {
-    console.log(isBinary ? message.toString() : message);
+  connection.on('message', (message) => {
+    //console.log(isBinary ? message.toString() : message);
+    const messageData = JSON.parse(message.toString());
+    const {recipient, text} = messageData;
+    //console.log(recipient, text);
+    if(recipient && text){
+      [...webSocketServer.clients]
+        .filter(client => client.userId === recipient)
+        .forEach(client => {client.send(JSON.stringify({text}))});
+    }
+    
   });
 
 

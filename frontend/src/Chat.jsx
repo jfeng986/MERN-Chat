@@ -31,17 +31,18 @@ export default function Chat() {
         if('online' in messageData){
             showOnlineUser(messageData.online);
         }
+        else{
+            console.log(messageData);
+        }
     }
 
     function sendMessage(event){
+        console.log("send message");
         event.preventDefault();
         ws.send(JSON.stringify({
-            message:{
-                recipient: selectedUserId,
-                text: messageText,
-            }
-    }));
-
+            recipient: selectedUserId,
+            text: messageText,
+        }));
     }
 
     const onlineUserExcluderUser = {...onlineUser};
