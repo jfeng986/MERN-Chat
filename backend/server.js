@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const { default: mongoose } = require('mongoose');
 const cors = require('cors');
 const User = require('./schema/user');
+const Message = require('./schema/message');
 const bcrybt = require('bcryptjs');
 const ws = require('ws');
 
@@ -99,15 +100,25 @@ webSocketServer.on('connection', (connection, req) => {
     }
   }
 
-  connection.on('message', (message) => {
+  connection.on('message', async (message) => {
     //console.log(isBinary ? message.toString() : message);
     const messageData = JSON.parse(message.toString());
     const {recipient, text} = messageData;
     //console.log(recipient, text);
     if(recipient && text){
+      const messageDoc = await Message.create({
+        sender: connection.userId,
+        recipient,
+        text,
+      });
       [...webSocketServer.clients]
         .filter(client => client.userId === recipient)
-        .forEach(client => {client.send(JSON.stringify({text}))});
+        .forEach(client => {client.send(JSON.stringify({
+          text,
+          sender:connection.userId,
+          recipient,
+          id: messageDoc._id,
+        }))});
     }
     
   });
