@@ -1,5 +1,6 @@
 import { useEffect,useState, useContext, useId } from "react"
 import Avatar from "./Avatar.jsx"
+import uniqBy from "lodash/uniqBy";
 
 
 import {UserContext} from "./UserContext.jsx";
@@ -11,6 +12,7 @@ export default function Chat() {
     const [selectedUserId,setSelectedUserId] = useState(null);
     const {username,id} = useContext(UserContext);
     const [messageText,setMessageText] = useState("");
+    const [messageList,setMessageList] = useState([]);
 
     useEffect(()=>{    
         const ws = new WebSocket("ws://localhost:3000");
@@ -28,11 +30,12 @@ export default function Chat() {
 
     function handleMessage(event){
         const messageData = JSON.parse(event.data);
+        console.log(event, messageData);
         if('online' in messageData){
             showOnlineUser(messageData.online);
         }
-        else{
-            console.log(messageData);
+        else if('text' in messageData){
+            setMessageList(prev => ([...prev,{...messageData}]));
         }
     }
 
@@ -43,10 +46,14 @@ export default function Chat() {
             recipient: selectedUserId,
             text: messageText,
         }));
+        setMessageText("");
+        setMessageList(prev => ([...prev,{text:messageText, isOur:true}]));
     }
 
     const onlineUserExcluderUser = {...onlineUser};
     delete onlineUserExcluderUser[id];
+
+    const messageWithoutDupes = uniqBy(messageList, 'id');
 
     return(
         <div className="flex h-screen">
@@ -78,6 +85,15 @@ export default function Chat() {
                         <div className="flex h-full items-center justify-center text-green-500 font-extrabold text-3xl">
                             Select a user to start chat
                         </div>)}
+                    {!!selectedUserId && (
+                        <div>
+                            {messageWithoutDupes.map(message =>(
+                                <div>
+                                    {message.text}
+                                </div>
+                            ))}    
+                        </div>
+                    )}
                 </div>
                 {!!selectedUserId && (
                     <form className="flex gap-2" onSubmit={sendMessage}>
