@@ -14,10 +14,17 @@ export default function Chat() {
   const messageRef = useRef();
 
   useEffect(() => {
+    connectToWs();
+  }, []);
+
+  function connectToWs() {
     const ws = new WebSocket("ws://localhost:3000");
     setWs(ws);
     ws.addEventListener("message", handleMessage);
-  }, []);
+    ws.addEventListener("close", () => {
+      setTimeout(connectToWs(), 1000);
+    });
+  }
 
   function showOnlineUser(onlineUser) {
     const onlineUserSet = {};
