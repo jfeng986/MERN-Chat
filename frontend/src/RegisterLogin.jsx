@@ -1,21 +1,20 @@
 import React, { useContext, useState } from "react";
-import {UserContext} from "./UserContext.jsx";
+import { UserContext } from "./UserContext.jsx";
 import axios from "axios";
 
 export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoginOrRegister, setIsLoginOrRegister] = useState("register");
-  const {setUsername:setLoggedInUsername, setId} = useContext(UserContext);
+  const { setUsername: setLoggedInUsername, setId } = useContext(UserContext);
 
-  async function handleSubmit(event){
+  async function handleSubmit(event) {
     event.preventDefault();
     const url = isLoginOrRegister === "register" ? "/register" : "/login";
-    const {data} = await axios.post(url, {username, password});
+    const { data } = await axios.post(url, { username, password });
     setLoggedInUsername(username);
     setId(data.id);
   }
-  
 
   return (
     <div className="bg-green-50 h-screen flex items-center">
@@ -40,16 +39,16 @@ export default function Register() {
         <div className="text-center mt-2">
           {isLoginOrRegister === "register" && (
             <div>
-              Already a member? 
-              <button onClick={()=>setIsLoginOrRegister("login")}>
+              Already a member?
+              <button onClick={() => setIsLoginOrRegister("login")}>
                 Login here
               </button>
             </div>
           )}
           {isLoginOrRegister === "login" && (
             <div>
-              Don't have an account?  
-              <button onClick={()=>setIsLoginOrRegister("register")} >
+              Don't have an account?
+              <button onClick={() => setIsLoginOrRegister("register")}>
                 register here
               </button>
             </div>

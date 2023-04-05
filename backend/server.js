@@ -1,138 +1,176 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
-const { default: mongoose } = require('mongoose');
-const cors = require('cors');
-const User = require('./schema/user');
-const Message = require('./schema/message');
-const bcrybt = require('bcryptjs');
-const ws = require('ws');
-
+const express = require("express");
+const dotenv = require("dotenv");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
+const { default: mongoose } = require("mongoose");
+const cors = require("cors");
+const User = require("./schema/user");
+const Message = require("./schema/message");
+const bcrybt = require("bcryptjs");
+const ws = require("ws");
 
 dotenv.config();
+
 mongoose.connect(process.env.MONGO_URL, (err) => {
-    if (err) throw err;
+  if (err) throw err;
 });
 
 const jwtSecret = process.env.JWT_SECRET_KEY;
 const bcrybtSalt = bcrybt.genSaltSync(10);
 const app = express();
 app.use(express.json());
-app.use(cookieParser())
-app.use(cors({
+app.use(cookieParser());
+app.use(
+  cors({
     credentials: true,
     origin: process.env.FRONTEND_URL,
-}));
+  })
+);
 
-app.get('/test', (req, res) => {
-    res.json('Hello World!');
+async function getUserDataFromRequest(req, res) {
+  return new Promise((resolve, reject) => {
+    const token = req.cookies?.token;
+    if (token) {
+      jwt.verify(token, jwtSecret, async (err, decoded) => {
+        if (err) throw err;
+        resolve(decoded);
+      });
+    } else {
+      reject("no token");
+    }
+  });
+}
+
+app.get("/test", (req, res) => {
+  res.json("Hello World!");
 });
 
-app.post('/register', async (req,res) => {
-  const {username,password} = req.body;
+app.post("/register", async (req, res) => {
+  const { username, password } = req.body;
   try {
     const createdUser = await User.create({
-      username, 
+      username,
       password: bcrybt.hashSync(password, bcrybtSalt),
     });
-    jwt.sign({userId:createdUser._id,username}, jwtSecret, {}, (err, token) => {
-      if (err) throw err;
-      res.cookie('token', token).status(201).json({
-        id: createdUser._id,
-      });
-    });
-  } catch(err) {
+    jwt.sign(
+      { userId: createdUser._id, username },
+      jwtSecret,
+      {},
+      (err, token) => {
+        if (err) throw err;
+        res.cookie("token", token).status(201).json({
+          id: createdUser._id,
+        });
+      }
+    );
+  } catch (err) {
     if (err) throw err;
-    res.status(500).json('error');
+    res.status(500).json("error");
   }
 });
 
-app.get('/profile', async (req, res) => {
+app.get("/profile", async (req, res) => {
   const token = req.cookies?.token;
-  if(token){
+  if (token) {
     jwt.verify(token, jwtSecret, async (err, decoded) => {
-      if(err) throw err;
+      if (err) throw err;
       res.json(decoded);
     });
+  } else {
+    res.status(401).json("no token");
   }
-  else{
-    res.status(401).json('no token');
-  }
-  
 });
 
-app.post('/login', async (req, res) => {
-  const {username,password} = req.body;
-  const foundUser = await User.findOne({username});
-  if(foundUser){
+app.get("/messages/:userId", async (req, res) => {
+  //res.json(req.params);
+  const { userId } = req.params;
+  const userData = await getUserDataFromRequest(req);
+  const myUserId = userData.userId;
+  const messages = await Message.find({
+    sender: { $in: [myUserId, myUserId] },
+    recipient: { $in: [userId, myUserId] },
+  })
+    .sort({ createdAt: -1 })
+    .exec();
+  res.json(messages);
+});
+
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  const foundUser = await User.findOne({ username });
+  if (foundUser) {
     const isPasswordValid = bcrybt.compareSync(password, foundUser.password);
-    if(isPasswordValid){
-      jwt.sign({userId:foundUser._id,username}, jwtSecret, {}, (err, token) => {
-        if (err) throw err;
-        res.cookie('token', token).status(201).json({
-          id: foundUser._id,
-        });
-      });
-    }
-    else{
-      res.status(401).json('wrong password');
+    if (isPasswordValid) {
+      jwt.sign(
+        { userId: foundUser._id, username },
+        jwtSecret,
+        {},
+        (err, token) => {
+          if (err) throw err;
+          res.cookie("token", token).status(201).json({
+            id: foundUser._id,
+          });
+        }
+      );
+    } else {
+      res.status(401).json("wrong password");
     }
   }
 });
 
 const server = app.listen(3000);
 
-
-const webSocketServer = new ws.WebSocketServer({server});
-webSocketServer.on('connection', (connection, req) => {
+const webSocketServer = new ws.WebSocketServer({ server });
+webSocketServer.on("connection", (connection, req) => {
   const cookies = req.headers.cookie;
-  if(cookies){
-    const tokenString = cookies.split(' ').find(str => str.startsWith('token='));
-    if(tokenString){
-      const token = tokenString.split('=')[1];
+  if (cookies) {
+    const tokenString = cookies
+      .split(" ")
+      .find((str) => str.startsWith("token="));
+    if (tokenString) {
+      const token = tokenString.split("=")[1];
       jwt.verify(token, jwtSecret, async (err, decoded) => {
-        if(err) throw err;
-        const{userId, username} = decoded;
+        if (err) throw err;
+        const { userId, username } = decoded;
         connection.userId = userId;
         connection.username = username;
       });
     }
   }
 
-  connection.on('message', async (message) => {
-    //console.log(isBinary ? message.toString() : message);
+  connection.on("message", async (message) => {
     const messageData = JSON.parse(message.toString());
-    const {recipient, text} = messageData;
-    //console.log(recipient, text);
-    if(recipient && text){
+    const { recipient, text } = messageData;
+    if (recipient && text) {
       const messageDoc = await Message.create({
         sender: connection.userId,
         recipient,
         text,
       });
       [...webSocketServer.clients]
-        .filter(client => client.userId === recipient)
-        .forEach(client => {client.send(JSON.stringify({
-          text,
-          sender:connection.userId,
-          recipient,
-          id: messageDoc._id,
-        }))});
+        .filter((client) => client.userId === recipient)
+        .forEach((client) => {
+          client.send(
+            JSON.stringify({
+              text,
+              sender: connection.userId,
+              recipient,
+              id: messageDoc._id,
+            })
+          );
+        });
     }
-    
   });
 
-
- 
   //notify all online clients about new user is joined
-  [...webSocketServer.clients].forEach(client => {
-      client.send(JSON.stringify({
-        online: [...webSocketServer.clients].map(client => ({userId:client.userId, username:client.username}))
-
-      }
-    ));
-  }
-);
+  [...webSocketServer.clients].forEach((client) => {
+    client.send(
+      JSON.stringify({
+        online: [...webSocketServer.clients].map((client) => ({
+          userId: client.userId,
+          username: client.username,
+        })),
+      })
+    );
+  });
 });
-
