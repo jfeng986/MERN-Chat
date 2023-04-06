@@ -1,1 +1,1 @@
-# a simple MEAN stack chat web app
+# a simple MERN stack chat web app
