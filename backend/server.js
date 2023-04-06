@@ -8,6 +8,7 @@ const User = require("./schema/user");
 const Message = require("./schema/message");
 const bcrybt = require("bcryptjs");
 const ws = require("ws");
+const fs = require("fs");
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ const bcrybtSalt = bcrybt.genSaltSync(10);
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+app.use("/uploads", express.static(__dirname + "uploads"));
 app.use(
   cors({
     credentials: true,
@@ -40,10 +42,6 @@ async function getUserDataFromRequest(req, res) {
     }
   });
 }
-
-app.get("/test", (req, res) => {
-  res.json("Hello World!");
-});
 
 app.post("/register", async (req, res) => {
   const { username, password } = req.body;
@@ -87,7 +85,6 @@ app.get("/users", async (req, res) => {
 });
 
 app.get("/messages/:userId", async (req, res) => {
-  //res.json(req.params);
   const { userId } = req.params;
   const userData = await getUserDataFromRequest(req);
   const myUserId = userData.userId;
@@ -121,10 +118,44 @@ app.post("/login", async (req, res) => {
   }
 });
 
+app.post("/logout", async (req, res) => {
+  res.clearCookie("token").json("ok");
+});
+
 const server = app.listen(3000);
 
 const webSocketServer = new ws.WebSocketServer({ server });
+
 webSocketServer.on("connection", (connection, req) => {
+  function notifyAllOnlineClients() {
+    [...webSocketServer.clients].forEach((client) => {
+      client.send(
+        JSON.stringify({
+          online: [...webSocketServer.clients].map((client) => ({
+            userId: client.userId,
+            username: client.username,
+          })),
+        })
+      );
+    });
+  }
+
+  connection.isAlive = true;
+
+  connection.timer = setInterval(() => {
+    connection.ping();
+    connection.deathTimer = setTimeout(() => {
+      connection.isAlive = false;
+      clearInterval(connection.timer);
+      connection.terminate();
+      notifyAllOnlineClients();
+    }, 1000);
+  }, 500);
+
+  connection.on("pong", () => {
+    clearTimeout(connection.deathTimer);
+  });
+
   const cookies = req.headers.cookie;
   if (cookies) {
     const tokenString = cookies
@@ -143,7 +174,16 @@ webSocketServer.on("connection", (connection, req) => {
 
   connection.on("message", async (message) => {
     const messageData = JSON.parse(message.toString());
-    const { recipient, text } = messageData;
+    const { recipient, text, file } = messageData;
+    if (file) {
+      console.log("size", file.data.length);
+      const parts = file.name.split(".");
+      const ext = parts[parts.length - 1];
+      filename = Date.now() + "." + ext;
+      const path = __dirname + "/uploads/" + filename;
+      const bufferData = new Buffer(file.data.split(",")[1], "base64");
+      fs.writeFile(path, bufferData, () => {});
+    }
     if (recipient && text) {
       const messageDoc = await Message.create({
         sender: connection.userId,
@@ -163,17 +203,6 @@ webSocketServer.on("connection", (connection, req) => {
           );
         });
     }
-  });
-
-  //notify all online clients about new user is joined
-  [...webSocketServer.clients].forEach((client) => {
-    client.send(
-      JSON.stringify({
-        online: [...webSocketServer.clients].map((client) => ({
-          userId: client.userId,
-          username: client.username,
-        })),
-      })
-    );
+    notifyAllOnlineClients();
   });
 });
