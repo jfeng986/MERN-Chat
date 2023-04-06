@@ -1,6 +1,6 @@
 import { useEffect, useState, useContext, useId, useRef } from "react";
 import Avatar from "./Avatar.jsx";
-import uniqBy from "lodash/uniqBy";
+import { uniqBy } from "lodash";
 import axios from "axios";
 import { UserContext } from "./UserContext.jsx";
 
@@ -8,21 +8,23 @@ export default function Chat() {
   const [ws, setWs] = useState(null);
   const [onlineUser, setOnlineUser] = useState({});
   const [selectedUserId, setSelectedUserId] = useState(null);
-  const { username, id } = useContext(UserContext);
+  const { username, id, setId, setUsername } = useContext(UserContext);
   const [messageText, setMessageText] = useState("");
   const [messageList, setMessageList] = useState([]);
   const messageRef = useRef();
 
   useEffect(() => {
     connectToWs();
-  }, []);
+  }, [selectedUserId]);
 
   function connectToWs() {
     const ws = new WebSocket("ws://localhost:3000");
     setWs(ws);
     ws.addEventListener("message", handleMessage);
     ws.addEventListener("close", () => {
-      setTimeout(connectToWs(), 1000);
+      setTimeout(() => {
+        connectToWs();
+      }, 1000);
     });
   }
 
@@ -36,17 +38,20 @@ export default function Chat() {
 
   function handleMessage(event) {
     const messageData = JSON.parse(event.data);
-    console.log(event, messageData);
+    //console.log(event, messageData);
     if ("online" in messageData) {
       showOnlineUser(messageData.online);
     } else if ("text" in messageData) {
-      setMessageList((prev) => [...prev, { ...messageData }]);
+      if (messageData.sender === selectedUserId) {
+        setMessageList((prev) => [...prev, { ...messageData }]);
+      }
+      console.log(messageData);
     }
   }
 
   function sendMessage(event) {
-    console.log("send message");
-    event.preventDefault();
+    //console.log("send message");
+    if (event) event.preventDefault();
     ws.send(
       JSON.stringify({
         recipient: selectedUserId,
@@ -60,7 +65,7 @@ export default function Chat() {
         text: messageText,
         sender: id,
         recipient: selectedUserId,
-        id: Date.now(),
+        _id: Date.now(),
       },
     ]);
   }
@@ -72,14 +77,16 @@ export default function Chat() {
 
   useEffect(() => {
     if (selectedUserId) {
-      axios.get("/messages/" + selectedUserId); //.then(res=>setMessageList(res.data))
+      axios.get("/messages/" + selectedUserId).then((res) => {
+        setMessageList(res.data);
+      });
     }
   }, [selectedUserId]);
 
   const onlineUserExcluderUser = { ...onlineUser };
   delete onlineUserExcluderUser[id];
 
-  const messageWithoutDupes = uniqBy(messageList, "id");
+  const messagesWithoutDupes = uniqBy(messageList, "_id");
 
   return (
     <div className="flex h-screen">
@@ -135,8 +142,9 @@ export default function Chat() {
           {!!selectedUserId && (
             <div className="relative h-full">
               <div className="overflow-y-scroll absolute inset-0">
-                {messageWithoutDupes.map((message) => (
+                {messagesWithoutDupes.map((message) => (
                   <div
+                    key={message._id}
                     className={
                       message.sender === id ? "text-right" : "text-left"
                     }
@@ -149,10 +157,6 @@ export default function Chat() {
                           : "bg-white text-gray-500")
                       }
                     >
-                      sender: {message.sender}
-                      <br />
-                      my id: {id}
-                      <br />
                       {message.text}
                     </div>
                   </div>
