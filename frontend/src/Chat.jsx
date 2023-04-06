@@ -3,10 +3,12 @@ import Avatar from "./Avatar.jsx";
 import { uniqBy } from "lodash";
 import axios from "axios";
 import { UserContext } from "./UserContext.jsx";
+import Contact from "./Contact.jsx";
 
 export default function Chat() {
   const [ws, setWs] = useState(null);
   const [onlineUser, setOnlineUser] = useState({});
+  const [offlineUser, setOfflineUser] = useState({});
   const [selectedUserId, setSelectedUserId] = useState(null);
   const { username, id, setId, setUsername } = useContext(UserContext);
   const [messageText, setMessageText] = useState("");
@@ -38,7 +40,6 @@ export default function Chat() {
 
   function handleMessage(event) {
     const messageData = JSON.parse(event.data);
-    //console.log(event, messageData);
     if ("online" in messageData) {
       showOnlineUser(messageData.online);
     } else if ("text" in messageData) {
@@ -83,8 +84,21 @@ export default function Chat() {
     }
   }, [selectedUserId]);
 
-  const onlineUserExcluderUser = { ...onlineUser };
-  delete onlineUserExcluderUser[id];
+  useEffect(() => {
+    axios.get("users").then((res) => {
+      const offlineUserArr = res.data
+        .filter((user) => user._id !== id)
+        .filter((user) => !Object.keys(onlineUser).includes(user._id));
+      const offlineUser = {};
+      offlineUserArr.forEach((user) => {
+        offlineUser[user._id] = user;
+      });
+      setOfflineUser(offlineUser);
+    });
+  }, [onlineUser]);
+
+  const onlineUserExcludeThisUser = { ...onlineUser };
+  delete onlineUserExcludeThisUser[id];
 
   const messagesWithoutDupes = uniqBy(messageList, "_id");
 
@@ -109,27 +123,28 @@ export default function Chat() {
           mernChat
         </div>
 
-        {Object.keys(onlineUserExcluderUser).map((userId) => (
-          <div
+        {Object.keys(onlineUserExcludeThisUser).map((userId) => (
+          <Contact
             key={userId}
-            className={
-              "border-b border-gray-100 py-2 pl-4 flex items-center gap-2 cursor-pointer" +
-              (userId === selectedUserId ? " bg-green-100" : "")
-            }
+            id={userId}
+            online={true}
+            username={onlineUserExcludeThisUser[userId]}
+            onClick={() => {
+              setSelectedUserId(userId);
+              console.log({ userId });
+            }}
+            selected={userId === selectedUserId}
+          />
+        ))}
+        {Object.keys(offlineUser).map((userId) => (
+          <Contact
+            key={userId}
+            id={userId}
+            online={false}
+            username={offlineUser[userId].username}
             onClick={() => setSelectedUserId(userId)}
-          >
-            {userId === selectedUserId && (
-              <div className="w-1 bg-green-500 h-12 rounded-r-md"></div>
-            )}
-            <div className="flex gap-1 py-2 pl-4 items-center">
-              <Avatar
-                username={onlineUser[userId]}
-                userId={userId}
-                online={onlineUser}
-              />
-              <span className="text-xl">{onlineUser[userId]}</span>
-            </div>
-          </div>
+            selected={userId === selectedUserId}
+          />
         ))}
       </div>
       <div className="bg-green-100 w-4/5 p-1 flex flex-col">

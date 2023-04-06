@@ -81,6 +81,11 @@ app.get("/profile", async (req, res) => {
   }
 });
 
+app.get("/users", async (req, res) => {
+  const users = await User.find({}, { _id: 1, username: 1 });
+  res.json(users);
+});
+
 app.get("/messages/:userId", async (req, res) => {
   //res.json(req.params);
   const { userId } = req.params;
