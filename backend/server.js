@@ -9,6 +9,7 @@ const Message = require("./schema/message");
 const bcrybt = require("bcryptjs");
 const ws = require("ws");
 const fs = require("fs");
+const path = require("path");
 
 dotenv.config();
 
@@ -21,7 +22,7 @@ const bcrybtSalt = bcrybt.genSaltSync(10);
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-app.use("/uploads", express.static(__dirname + "uploads"));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(
   cors({
     credentials: true,
@@ -175,8 +176,8 @@ webSocketServer.on("connection", (connection, req) => {
   connection.on("message", async (message) => {
     const messageData = JSON.parse(message.toString());
     const { recipient, text, file } = messageData;
+    let filename = null;
     if (file) {
-      console.log("size", file.data.length);
       const parts = file.name.split(".");
       const ext = parts[parts.length - 1];
       filename = Date.now() + "." + ext;
@@ -184,11 +185,12 @@ webSocketServer.on("connection", (connection, req) => {
       const bufferData = new Buffer(file.data.split(",")[1], "base64");
       fs.writeFile(path, bufferData, () => {});
     }
-    if (recipient && text) {
+    if (recipient && (text || file)) {
       const messageDoc = await Message.create({
         sender: connection.userId,
         recipient,
         text,
+        file: file ? filename : null,
       });
       [...webSocketServer.clients]
         .filter((client) => client.userId === recipient)
@@ -198,11 +200,12 @@ webSocketServer.on("connection", (connection, req) => {
               text,
               sender: connection.userId,
               recipient,
+              file: file ? filename : null,
               _id: messageDoc._id,
             })
           );
         });
     }
-    notifyAllOnlineClients();
   });
+  notifyAllOnlineClients();
 });
